@@ -308,7 +308,6 @@ class WSDL_Gen {
     $root->setAttributeNS('http://www.w3.org/2000/xmlns/', 'xmlns:soap-env',self::SCHEMA_SOAP);
     $root->setAttributeNS('http://www.w3.org/2000/xmlns/', 'xmlns:wsdl',self::SCHEMA_WSDL);
     $root->setAttributeNS('http://www.w3.org/2000/xmlns/', 'xmlns:soapenc',self::SOAP_SCHEMA_ENCODING);
-    $root->setAttributeNS('http://www.w3.org/2000/xmlns/', 'xmlns',$this->ns);
     $root->setAttribute('targetNamespace', $this->ns);
     $this->addTypes($wsdl, $root);
     $this->addMessages($wsdl, $root);
