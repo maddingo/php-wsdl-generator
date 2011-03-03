@@ -62,6 +62,8 @@ class WSDL_Gen {
       $this->operations[$method->getName()]['input'] = array();
       $this->operations[$method->getName()]['output'] = array();
       $doc = $method->getDocComment();
+      
+      // extract input params
       if(preg_match_all('|@param\s+(?:object\s+)?(\w+)\s+\$(\w+)|', $doc, $matches, PREG_SET_ORDER)) {
         foreach($matches as $match) {
           $this->mytypes[$match[1]] = 1;
@@ -69,13 +71,37 @@ class WSDL_Gen {
                 array('name' => $match[2], 'type' => $match[1]);
         }
       }
+      
+      // extract return types
       if(preg_match('|@return\s+(?:object\s+)?(\w+)|', $doc, $match)) {
         $this->mytypes[$match[1]] = 1;
         $this->operations[$method->getName()]['output'][] = 
               array('name' => 'return', 'type' => $match[1]);
       }
+      
+      // extract documentation
+      $comment = trim($doc);
+      $commentStart = strpos($comment, '/**') + 3;
+      $comment = trim(substr($comment, $commentStart, strlen($comment)-5));
+      $description = '';
+      $lines = preg_split("(\\n\\r|\\r\\n\\|\\r|\\n)", $comment);
+      foreach ($lines as $line) {
+        $line = trim($line);
+        $lineStart = strpos($line, '*');
+        if ($lineStart === false) {
+        	$lineStart = -1;
+        }
+        $line = trim(substr($line, $lineStart + 1));
+        if (!isset($line[0]) || $line[0] != "@") {
+        	if (strlen($line) > 0) {
+        		$description .= "\n$line";
+        	}
+        }
+      }
+	  $this->operations[$method->getName()]['documentation'] = $description;
     }
   }
+  
   protected function discoverTypes() {
     foreach(array_keys($this->mytypes) as $type) {
       if(!isset($this->types[$type])) {
@@ -144,6 +170,10 @@ class WSDL_Gen {
     foreach($this->operations as $name => $params) {
       $op = $doc->createElementNS(self::SCHEMA_WSDL, 'operation');
       $op->setAttribute('name', $name);
+      $opDocu = $doc->createElementNS(self::SCHEMA_WSDL, 'documentation');
+      $docuText = $doc->createTextNode($params['documentation']);
+      $opDocu->appendChild($docuText);
+      $op->appendChild($opDocu);
       foreach(array('input' => '', 'output' => 'Response') as $type => $postfix) {
         $sel = $doc->createElementNS(self::SCHEMA_WSDL, $type);
         $fullName = "$name".ucfirst($postfix);
@@ -292,3 +322,4 @@ class WSDL_Gen {
 }
 
 /* vim: set ts=2 sts=2 bs=2 ai expandtab : */
+
