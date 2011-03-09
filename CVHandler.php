@@ -1,5 +1,25 @@
 <?php
 
+class ReturnClass {
+	/**
+	 * 
+	 * @var string
+	 */
+	public $name;
+	
+	/**
+	 * 
+	 * @var int
+	 */
+	public $counter;
+	
+	/**
+	 * 
+	 * @var unknown_type
+	 */
+	public $rest;
+}
+
 interface CVHandler {
 
 	/**
@@ -33,7 +53,7 @@ interface CVHandler {
 	 * Update CP article for a Person (ID) 
 	 *
 	 * @param int $id	 
-	 * @return boolean
+	 * @return object ReturnClass
 	 */
 	function updateByID($id);
 }

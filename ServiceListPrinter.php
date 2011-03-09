@@ -22,6 +22,7 @@ class ServiceListPrinter {
 		$this->reqClass = false;
 		$this->reqClassFile = false;
 		$this->wsdlReq = false;
+//		echo "<pre>"; var_dump($_SERVER); echo "</pre>";
 		if (isset($_SERVER['PATH_INFO'])) {
 			$reqClass = str_replace('/', '', $_SERVER['PATH_INFO']);
 			if (in_array($reqClass, $classes)) {

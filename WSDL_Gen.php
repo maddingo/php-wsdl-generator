@@ -24,7 +24,9 @@ class WSDL_Gen {
     'string' => array('ns'   => self::SOAP_XML_SCHEMA_VERSION,
                       'name' => 'string'),
     'boolean' => array('ns' => self::SOAP_XML_SCHEMA_VERSION,
-                      'name' => 'boolean')
+                      'name' => 'boolean'),
+    'unknown_type' => array('ns' => self::SOAP_XML_SCHEMA_VERSION,
+                      'name' => 'any')
   );
   
   public $types;
@@ -74,7 +76,7 @@ class WSDL_Gen {
       
       // extract return types
       if(preg_match('|@return\s+(?:object\s+)?(\w+)|', $doc, $match)) {
-        $this->mytypes[$match[1]] = 1;
+      	$this->mytypes[$match[1]] = 1;
         $this->operations[$method->getName()]['output'][] = 
               array('name' => 'return', 'type' => $match[1]);
       }
@@ -104,7 +106,7 @@ class WSDL_Gen {
   
   protected function discoverTypes() {
     foreach(array_keys($this->mytypes) as $type) {
-      if(!isset($this->types[$type])) {
+    	if(!isset($this->types[$type])) {
         $this->addComplexType($type);
       }
     }
@@ -134,8 +136,9 @@ class WSDL_Gen {
     foreach($class->getProperties() as $prop) {
       $doc = $prop->getDocComment();
       if(preg_match('|@var\s+(?:object\s+)?(\w+)|', $doc, $match)) {
-        $type = $match[1];
+      	$type = $match[1];
         $this->complexTypes[$className][] = array('name' => $prop->getName(), 'type' => $type);
+//echo "<pre>"; var_dump($match); var_dump($this->complexTypes); echo "</pre>";
         if(!isset($this->types[$type])) {
           $this->addComplexType($type);
         }

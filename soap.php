@@ -5,7 +5,7 @@ $soapClasses 	= array(
 	'CVHandler'
 );
 
-$slp = new ServiceListPrinter($soapClasses, "http://www.uis.no/cp");
+$slp = new ServiceListPrinter($soapClasses, "http://www.uis.no/cp/");
 
 if ($slp->isNonSoapRequest()) {
 	//echo "<pre>";var_dump($slp); echo "</pre>";
