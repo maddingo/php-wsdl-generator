@@ -17,7 +17,8 @@ class ServiceListPrinter {
 		$this->reqURL = $_SERVER['REQUEST_URI'];
 		$this->nsBase = $nsBase;
 		$this->reqSelf = $_SERVER["PHP_SELF"];
-		$this->baseURL= "http://".$_SERVER["HTTP_HOST"];
+		$protocol = isset($_SERVER['HTTPS']) ? 'https://' : 'http://';
+		$this->baseURL= $protocol.$_SERVER["HTTP_HOST"];
 
 		$this->reqClass = false;
 		$this->reqClassFile = false;
