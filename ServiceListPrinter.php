@@ -19,7 +19,7 @@ class ServiceListPrinter {
 		$this->reqSelf = $_SERVER["PHP_SELF"];
 		$protocol = isset($_SERVER['HTTPS']) ? 'https://' : 'http://';
 		$this->baseURL= $protocol.$_SERVER["HTTP_HOST"];
-
+		
 		$this->reqClass = false;
 		$this->reqClassFile = false;
 		$this->wsdlReq = false;
@@ -38,6 +38,17 @@ class ServiceListPrinter {
 
 	public function isNonSoapRequest() {
 		return ($this->reqClass === false || $this->wsdlReq);
+	}
+	
+	public function getRequestClass() {
+		return $this->reqClass;
+	}
+	
+	/**
+	 * Get Namespace for request class.
+	 */
+	public function getRequestClassNS() {
+		return $this->nsBase.$this->reqClass;
 	}
 	
 	public function show() {
@@ -65,7 +76,7 @@ class ServiceListPrinter {
 	
 			require_once("$cls.php");
 			// TODO: The endpoint address and namespace are really not necessary at this point
-			$gen = new WSDL_Gen($cls, $this->baseUrl.$this->reqSelf, $this->nsBase.$cls);
+			$gen = new WSDL_Gen($cls, $this->baseURL.$this->reqSelf, $this->nsBase.$cls);
 	
 			echo "<table>";
 			foreach ($gen->operations as $operName => $oper) {
