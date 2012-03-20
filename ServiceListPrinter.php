@@ -23,13 +23,12 @@ class ServiceListPrinter {
 		$this->reqClass = false;
 		$this->reqClassFile = false;
 		$this->wsdlReq = false;
-//		echo "<pre>"; var_dump($_SERVER); echo "</pre>";
 		if (isset($_SERVER['PATH_INFO'])) {
 			$reqClass = str_replace('/', '', $_SERVER['PATH_INFO']);
 			if (in_array($reqClass, $classes)) {
 				$this->reqClass = $reqClass;
 				$this->reqClassFile = $reqClass.'.php';
-				if ($_SERVER['QUERY_STRING'] == 'WSDL') {
+				if (isset($_REQUEST['WSDL'])) {
 					$this->wsdlReq = true;
 				}
 			}
@@ -66,12 +65,19 @@ class ServiceListPrinter {
 		echo $wsdlgen->toXML();
 	}
 	
+	protected function getWsdlUrl($cls) {
+		$u = parse_url($this->reqURL);
+		
+		return $u['path']."/$cls?WSDL&".$u['query'];
+	}
+	
 	protected function showServiceList() {
 		echo "<h1>Services</h1>";
 		
 		foreach ($this->soapClasses as $cls) {
 			echo "<h2>$cls</h2>";
-			echo "<span class='wsdl-link'>(<a href=\"$this->reqURL/$cls?WSDL\">WSDL</a>)</span>";
+			$wsdlUrl = $this->getWsdlUrl($cls); 
+			echo "<span class='wsdl-link'>(<a href=\"$wsdlUrl\">WSDL</a>)</span>";
 			echo "<h3>Functions</h3>";
 	
 			require_once("$cls.php");
