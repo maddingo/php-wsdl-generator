@@ -11,11 +11,15 @@ if ($slp->isNonSoapRequest()) {
 	//echo "<pre>";var_dump($slp); echo "</pre>";
 	$slp->show();
 } else {
-	$soapClass = $slp->getRequestClass();
-	$soapImpl = $soapClass.'Impl';
-	include_once($soapImpl.'.php');
-	$server = new SoapServer(null, array('uri' => "http://www.uis.no/cp/$soapClass", 'style' => SOAP_DOCUMENT, 'use' => SOAP_LITERAL));
-	$server->setClass($soapClass);
-	$server->handle();
+	try {
+		$soapClass = $slp->getRequestClass();
+		$soapImpl = $soapClass.'Impl';
+		include_once($soapImpl.'.php');
+		$server = new SoapServer(null, array('uri' => "http://www.uis.no/cp/$soapClass", 'style' => SOAP_DOCUMENT, 'use' => SOAP_LITERAL));
+		$server->setClass($soapClass);
+		$server->handle();
+	} catch(Exception $ex) {
+		 $slp-fault($ex);
+	}
 }
 

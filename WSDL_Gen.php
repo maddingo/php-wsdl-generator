@@ -1,5 +1,19 @@
 <?php
 
+class SoapError extends Exception {
+	/**
+	 * short error message
+	 * @var string
+	 */
+	public $message;
+	
+	/**
+	 * detailed error message
+	 * @var string
+	 */
+	public $detail; 	
+}
+
 /**
  * WSDL_Gen: A WSDL Generator for PHP5
  *
@@ -15,7 +29,7 @@ class WSDL_Gen {
   const SCHEMA_SOAP_HTTP = 'http://schemas.xmlsoap.org/soap/http';
   const SCHEMA_SOAP = 'http://schemas.xmlsoap.org/wsdl/soap/';
   const SCHEMA_WSDL = 'http://schemas.xmlsoap.org/wsdl/';
-  const SOAP_FAULT = 'SoapFault';
+  const SOAP_FAULT = 'SoapError';
 
   static public $baseTypes = array(
     'int'    => array('ns'   => self::SOAP_XML_SCHEMA_VERSION,
@@ -32,6 +46,7 @@ class WSDL_Gen {
   
   public $types;
   public $operations = array();
+  public $faults = array();
   public $className;
   public $ns;
   public $endpoint;
@@ -83,6 +98,13 @@ class WSDL_Gen {
               array('name' => 'return', 'type' => $match[1]);
       }
       
+      // extract exception
+      if(preg_match('|@throws\s+(?:object\s+)?(\w+)|', $doc, $match)) {
+      	$this->mytypes[$match[1]] = 1;
+        $this->operations[$method->getName()]['fault'][] = $match[1];
+        $this->faults[] = $match[1];
+      }
+            
       // extract documentation
       $comment = trim($doc);
       $commentStart = strpos($comment, '/**') + 3;
@@ -113,6 +135,7 @@ class WSDL_Gen {
       }
     }
   }
+  
   protected function createPHPTypes() {
     $this->complexTypes['mixed'] = array(
                                      array('name' => 'varString',
@@ -148,31 +171,43 @@ class WSDL_Gen {
   }
   
   protected function addMessages(DomDocument $doc, DomElement $root) {
+    $nsPrefix = $root->lookupPrefix($this->ns);
     foreach($this->operations as $name => $params) {
-	  foreach(array('input' => '', 'output' => 'Response') as $type => $postfix) {
+      $msgConfig = array(
+      	'input' => array('postfix' => '', 'partName' => 'partParams'),
+      	'output' => array('postfix' => 'Response', 'partName' => 'partResponse')
+      );
+      
+
+	  foreach($msgConfig as $type => $cfg) {
         $el = $doc->createElementNS(self::SCHEMA_WSDL, 'message');
-        $fullName = "$name".ucfirst($postfix);
+        $fullName = "$name".ucfirst($cfg['postfix']);
         $el->setAttribute("name", $fullName);
         $part = $doc->createElementNS(self::SCHEMA_WSDL, 'part');
-        $part->setAttribute('element', 'tns:' . $fullName);
-        $part->setAttribute('name', 'parameters');
+        
+        $part->setAttribute('element', "$nsPrefix:$fullName");
+        $part->setAttribute('name', $cfg['partName']);
         $el->appendChild($part);
         $root->appendChild($el);
       }
-      
     }
+      
+    // fault messages
+    foreach ($this->faults as $faultType) {
     $el = $doc->createElementNS(self::SCHEMA_WSDL, 'message');
-    $el->setAttribute('name', self::SOAP_FAULT);
+      $el->setAttribute("name", $faultType);
     $part = $doc->createElementNS(self::SCHEMA_WSDL, 'part');
-    $part->setAttribute('element', 'tns:'.self::SOAP_FAULT);
-    $part->setAttribute('name', 'fault');
+      $part->setAttribute('element', "$nsPrefix:$faultType");
+      $part->setAttribute('name', 'partException');
     $el->appendChild($part);
     $root->appendChild($el);
+  }
   }
   
   protected function addPortType(DomDocument $doc, DomElement $root) {
     $el = $doc->createElementNS(self::SCHEMA_WSDL, 'portType');
     $el->setAttribute('name', $this->className."PortType");
+    $nsPrefix = $root->lookupPrefix($this->ns);
     foreach($this->operations as $name => $params) {
       $op = $doc->createElementNS(self::SCHEMA_WSDL, 'operation');
       $op->setAttribute('name', $name);
@@ -183,22 +218,26 @@ class WSDL_Gen {
       foreach(array('input' => '', 'output' => 'Response') as $type => $postfix) {
         $sel = $doc->createElementNS(self::SCHEMA_WSDL, $type);
         $fullName = "$name".ucfirst($postfix);
-        $sel->setAttribute('message', 'tns:'. $fullName);
+        $sel->setAttribute('message', "$nsPrefix:$fullName");
         $sel->setAttribute('name', $fullName);
         $op->appendChild($sel);
       }
+      foreach($params['fault'] as $faultType) {
       $sel = $doc->createElementNS(self::SCHEMA_WSDL, 'fault');
-      $sel->setAttribute('message', 'tns:'.self::SOAP_FAULT);
-      $sel->setAttribute('name', self::SOAP_FAULT);
+      	$sel->setAttribute('message', "$nsPrefix:$faultType");
+      	$sel->setAttribute('name', $faultType.'Fault');
       $op->appendChild($sel); 
+      }
       $el->appendChild($op);
     }
     $root->appendChild($el);
   }
+  
   protected function addBinding(DomDocument $doc, DomElement $root) {
+  	$nsPrefix = $root->lookupPrefix($this->ns);
     $el = $doc->createElementNS(self::SCHEMA_WSDL, 'binding');
     $el->setAttribute('name', $this->className."Binding");
-    $el->setAttribute('type', "tns:{$this->className}PortType");
+    $el->setAttribute('type', "$nsPrefix:{$this->className}PortType");
 
     $s_binding = $doc->createElementNS(self::SCHEMA_SOAP, 'binding');
     $s_binding->setAttribute('style', 'document');
@@ -215,17 +254,27 @@ class WSDL_Gen {
         $sel->appendChild($s_body);
         $op->appendChild($sel);
       }
+      foreach ($params['fault'] as $faultType) {
+      	$sel = $doc->createElementNS(self::SCHEMA_WSDL, 'fault');
+      	$sel->setAttribute('name', $faultType.'Fault');
+        $s_body = $doc->createElementNS(self::SCHEMA_SOAP, 'body');
+        $s_body->setAttribute('use', 'literal');
+        $sel->appendChild($s_body);
+        $op->appendChild($sel);
+      } 
       $el->appendChild($op);
     }
     $root->appendChild($el);
   }
+  
   protected function addService(DomDocument $doc, DomElement $root) {
+  	$nsPrefix = $root->lookupPrefix($this->ns);
     $el = $doc->createElementNS(self::SCHEMA_WSDL, 'service');
-    $el->setAttribute('name', $this->className."Service");
+    $el->setAttribute('name', "{$this->className}Service");
 
     $port = $doc->createElementNS(self::SCHEMA_WSDL, 'port');
-    $port->setAttribute('name', $this->className."Port");
-    $port->setAttribute('binding', "tns:{$this->className}Binding");
+    $port->setAttribute('name', "{$this->className}Port");
+    $port->setAttribute('binding', "$nsPrefix:{$this->className}Binding");
 
     $addr = $doc->createElementNS(self::SCHEMA_SOAP, 'address');
     $addr->setAttribute('location', $this->endpoint);
@@ -239,8 +288,8 @@ class WSDL_Gen {
     $types = $doc->createElementNS(self::SCHEMA_WSDL, 'types');
     $root->appendChild($types);
     $el = $doc->createElementNS(self::SOAP_XML_SCHEMA_VERSION, 'schema');
-    $el->setAttribute('attributeFormDefault', 'unqualified');
-    $el->setAttribute('elementFormDefault', 'unqualified');
+    $el->setAttribute('attributeFormDefault', 'qualified');
+    $el->setAttribute('elementFormDefault', 'qualified');
     $el->setAttribute('targetNamespace', $this->ns);
     $types->appendChild($el);
 
@@ -251,7 +300,7 @@ class WSDL_Gen {
       $ct = $doc->createElementNS(self::SOAP_XML_SCHEMA_VERSION, 'complexType');
       $ct->setAttribute('name', $name);
 
-      $all = $doc->createElementNS(self::SOAP_XML_SCHEMA_VERSION, 'all');
+      $all = $doc->createElementNS(self::SOAP_XML_SCHEMA_VERSION, 'sequence');
 
       foreach($data as $prop) {
         $p = $doc->createElementNS(self::SOAP_XML_SCHEMA_VERSION, 'element');
@@ -264,13 +313,15 @@ class WSDL_Gen {
       $el->appendChild($ct);
     }
     
+    $nsPrefix = $root->lookupPrefix($this->ns);
+    
     // Add message types
 	foreach($this->operations as $name => $params) {
       foreach(array('input' => '', 'output' => 'Response') as $type => $postfix) {
       	$ce = $doc->createElementNS(self::SOAP_XML_SCHEMA_VERSION, 'element');
         $fullName = "$name".ucfirst($postfix);
       	$ce->setAttribute('name', $fullName);
-      	$ce->setAttribute('type', 'tns:' . $fullName);
+	    $ce->setAttribute('type', "$nsPrefix:$fullName");
       	$el->appendChild($ce);
         
       	$ct = $doc->createElementNS(self::SOAP_XML_SCHEMA_VERSION, 'complexType');
@@ -286,14 +337,27 @@ class WSDL_Gen {
         }
         $el->appendChild($ct);
       }
-      
     }
-    // fault message elements
+    
+    // Add fault elements
+    foreach ($this->faults as $faultType) {
+      $ce = $doc->createElementNS(self::SOAP_XML_SCHEMA_VERSION, 'element');
+      $ce->setAttribute('name', $faultType);
+      $prefix = $root->lookupPrefix($this->types[$faultType]['ns']);
+      $ce->setAttribute('type', $prefix.':'.$faultType);
+      $el->appendChild($ce);
+      
     $ce = $doc->createElementNS(self::SOAP_XML_SCHEMA_VERSION, 'element');
-    $ce->setAttribute('name', self::SOAP_FAULT);
-    $prefix = $root->lookupPrefix(self::SOAP_XML_SCHEMA_VERSION);
-    $ce->setAttribute('type',"$prefix:string");
+      $ce->setAttribute('name', $faultType.'Fault');
+      $ct = $doc->createElementNS(self::SOAP_XML_SCHEMA_VERSION, 'complexType');
+      $seq = $doc->createElementNS(self::SOAP_XML_SCHEMA_VERSION, 'sequence');
+      $elFault = $doc->createElementNS(self::SOAP_XML_SCHEMA_VERSION, 'element');
+      $elFault->setAttribute('ref', $prefix.':'.$faultType);
+      $seq->appendChild($elFault);
+      $ct->appendChild($seq);
+      $ce->appendChild($ct);
     $el->appendChild($ce);
+  }
   }
 
   /**

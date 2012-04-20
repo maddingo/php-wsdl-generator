@@ -68,7 +68,12 @@ class ServiceListPrinter {
 	protected function getWsdlUrl($cls) {
 		$u = parse_url($this->reqURL);
 		
-		return $u['path']."/$cls?WSDL&".$u['query'];
+		$url = "{$u['path']}/$cls?";
+		if (isset($u['query'])) {
+			$url .= "{$u['query']}&";
+		}
+		$url .= 'WSDL';
+		return $url;
 	}
 	
 	protected function showServiceList() {
@@ -121,5 +126,25 @@ class ServiceListPrinter {
 		echo "<p class='impressum'>";
 		echo "<script type=\"text/javascript\" src=\"http://www.ohloh.net/p/488478/widgets/project_thin_badge.js\"></script>";
 		echo "</p>";
+	}
+	
+	public function fault($ex) {
+		header('Content-Type: text/xml');
+		header('Status: 500');
+		$detail = method_exists($ex, 'getDetail') ? $ex->getDetail() : "{$ex->getFile()}:{$ex->getLine()}\n{$ex->getTraceAsString()}";
+		die('<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/">
+		<soapenv:Body>
+		  <soapenv:Fault>
+		    <faultcode>soapenv:Server</faultcode>
+		    <faultstring>'.$ex->getMessage().'</faultstring>
+		    <detail>
+		      <ns0:SoapError xmlns:ns0="'.$this->getRequestClassNS().'">
+		      	<ns0:message>'.$ex->getMessage().'</ns0:message>
+		      	<ns0:detail>'.$detail.'</ns0:detail>
+		      </ns0:SoapError>
+		    </detail>
+		  </soapenv:Fault>
+		</soapenv:Body>
+		</soapenv:Envelope>');
 	}
 }
